@@ -141,8 +141,13 @@ int util_buf_grow(struct util_buf_pool *pool)
 		buf_ftr->region = buf_region;
 		buf_ftr->index = pool->num_allocated + i;
 		if (!pool->attr.indexing.ordered) {
-			dlist_insert_tail(&buf_ftr->entry.dlist,
-					  &pool->list.buffers);
+			if (!pool->attr.garbage_collector)
+				slist_insert_tail(&buf_ftr->entry.slist,
+						    &pool->list.buffers.slist);
+			else
+				dlist_insert_tail(&buf_ftr->entry.dlist,
+						    &pool->list.buffers.dlist);
+			
 		} else {
 			dlist_insert_tail(&buf_ftr->entry.dlist,
 					  &buf_region->buf_list);
@@ -189,10 +194,14 @@ int util_buf_pool_create_attr(struct util_buf_attr *attr,
 	else
 		(*buf_pool)->attr.is_mmap_region = 1;
 
-	if (!(*buf_pool)->attr.indexing.ordered)
-		dlist_init(&(*buf_pool)->list.buffers);
-	else
+	if (!(*buf_pool)->attr.indexing.ordered) {
+		if (!(*buf_pool)->attr.garbage_collector)
+			slist_init(&(*buf_pool)->list.buffers.slist);
+		else
+			dlist_init(&(*buf_pool)->list.buffers.dlist);
+	} else {
 		dlist_init(&(*buf_pool)->list.regions);
+	}
 
 	return FI_SUCCESS;
 }
