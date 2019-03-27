@@ -276,12 +276,15 @@ static inline uint32_t rxd_tx_flags(uint64_t fi_flags)
 static inline uint32_t rxd_rx_flags(uint64_t fi_flags)
 {
 	uint32_t rxd_flags = 0;
-
+	
 	if (fi_flags & FI_MULTI_RECV)
 		rxd_flags |= RXD_MULTI_RECV;
 	if (fi_flags & FI_COMPLETION)
 		return rxd_flags;
-
+	if (fi_flags & FI_PEEK){
+		printf("FI_PEEK\n");
+		return rxd_flags;
+	}
 	return rxd_flags | RXD_NO_RX_COMP;
 }
 

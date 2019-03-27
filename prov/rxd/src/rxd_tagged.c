@@ -72,10 +72,12 @@ ssize_t rxd_ep_trecvmsg(struct fid_ep *ep_fid, const struct fi_msg_tagged *msg,
 
 	ep = container_of(ep_fid, struct rxd_ep, util_ep.ep_fid.fid);
 
+	// Last arg: there FI_PEEK generates
 	return rxd_ep_generic_recvmsg(ep, msg->msg_iov, msg->iov_count, msg->addr,
 				      msg->tag, msg->ignore, msg->context,
-				      ofi_op_tagged, rxd_rx_flags(flags |
-				      ep->util_ep.rx_msg_flags) | RXD_TAG_HDR);
+				      ofi_op_tagged, flags | ep->util_ep.rx_msg_flags);
+				     //rxd_rx_flags(flags &
+				    //ep->util_ep.rx_msg_flags) | RXD_TAG_HDR);
 }
 
 ssize_t rxd_ep_tsend(struct fid_ep *ep_fid, const void *buf, size_t len,

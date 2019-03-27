@@ -1038,11 +1038,11 @@ void rxd_handle_send_comp(struct rxd_ep *ep, struct fi_cq_msg_entry *comp)
 	switch (rxd_pkt_type(pkt_entry)) {
 	case RXD_CTS:
 	case RXD_ACK:
-		dlist_remove(&pkt_entry->d_entry);
+			dlist_remove(&pkt_entry->d_entry);
 		ofi_buf_free(pkt_entry);
 		break;
 	default:
-		if (pkt_entry->flags & RXD_PKT_ACKED) {
+			if (pkt_entry->flags & RXD_PKT_ACKED) {
 			peer = pkt_entry->peer;
 			dlist_remove(&pkt_entry->d_entry);
 			ofi_buf_free(pkt_entry);
@@ -1082,7 +1082,7 @@ void rxd_handle_recv_comp(struct rxd_ep *ep, struct fi_cq_msg_entry *comp)
 		rxd_handle_data(ep, pkt_entry);
 		break;
 	default:
-		rxd_handle_op(ep, pkt_entry);
+			rxd_handle_op(ep, pkt_entry);
 		/* don't need to perform action below:
 		 * - remove RX packet
 		 * - release/repost RX packet */

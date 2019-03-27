@@ -143,12 +143,30 @@ ssize_t rxd_ep_generic_recvmsg(struct rxd_ep *rxd_ep, const struct iovec *iov,
 		unexp_list = &rxd_ep->unexp_list;
 		rx_list = &rxd_ep->rx_list;
 	}
+	if (rxd_flags & FI_PEEK) {
+		if(!(rxd_ep_check_unexp_msg_list(rxd_ep, unexp_list, rx_list, rx_entry))) {
+			printf("Error cq_write\n");
+			dlist_remove(rx_list);
+			fastlock_release(&rxd_ep->util_ep.lock);
+			return ofi_cq_write_error_peek(&rxd_ep_rx_cq(rxd_ep)->util_cq, 
+					tag, context);
+		} else {
+			printf("Making a compliteon\n");
+			ret = ofi_cq_write(&rxd_ep_rx_cq(rxd_ep)->util_cq,
+							   context, FI_TAGGED | FI_RECV,
+							   rx_entry->cq_entry.len, NULL,
+							   rx_entry->cq_entry.data,
+							   rx_entry->cq_entry.tag);
+			goto out;
+		}
+	}
+/*TODO:
 
-	if (!dlist_empty(unexp_list) &&
-	    rxd_ep_check_unexp_msg_list(rxd_ep, unexp_list, rx_list, rx_entry))
-		goto out;
-
-	dlist_insert_tail(&rx_entry->entry, rx_list);
+       if (rxd_flags & FI_CLAIM)
+            printf("FI_CLAIM\n");
+        if(rxd_flags & FI_DISCARD)
+            printf("FI_DISCARD\n");
+*/
 out:
 	fastlock_release(&rxd_ep->util_ep.lock);
 	return ret;
