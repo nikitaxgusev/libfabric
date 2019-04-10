@@ -324,6 +324,14 @@ static struct ofi_prov *ofi_create_prov_entry(const char *prov_name)
  */
 static void ofi_ordered_provs_init(void)
 {
+#ifdef _WIN32 /* For Windows return sockets provider first */
+	char *ordered_prov_names[] = {
+		"sockets", "psm2", "psm", "usnic", "mlx", "gni",
+		"bgq", "netdir", "ofi_rxm", "ofi_rxd", "verbs",
+		"UDP", "tcp",
+		"ofi_perf_hook", "ofi_noop_hook",
+	};
+#else
 	char *ordered_prov_names[] = {
 		"psm2", "psm", "efa", "usnic", "gni", "bgq", "verbs",
 		"netdir", "ofi_rxm", "ofi_rxd", "shm",
@@ -341,6 +349,7 @@ static void ofi_ordered_provs_init(void)
 		 */
 		"ofi_hook_perf", "ofi_hook_debug", "ofi_hook_noop",
 	};
+#endif
 	int num_provs = sizeof(ordered_prov_names)/sizeof(ordered_prov_names[0]), i;
 
 	for (i = 0; i < num_provs; i++)
