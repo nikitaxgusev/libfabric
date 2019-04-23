@@ -66,6 +66,13 @@ static ssize_t rxd_generic_write_inject(struct rxd_ep *rxd_ep,
 		goto out;
 	}
 
+	tx_entry = rxd_tx_entry_init_rma(rxd_ep, tx_entry,
+					 rma_iov, rma_count, rxd_flags);
+	if (!tx_entry) {
+		ret = -FI_EAGAIN;
+		goto out;
+	}
+	
 	ret = rxd_ep_send_op(rxd_ep, tx_entry, rma_iov, rma_count, NULL, 0, 0, 0);
 	if (ret) {
 		rxd_tx_entry_free(rxd_ep, tx_entry);
@@ -115,6 +122,12 @@ ssize_t rxd_generic_rma(struct rxd_ep *rxd_ep, const struct iovec *iov,
 		goto out;
 	}
 
+	tx_entry = rxd_tx_entry_init_rma(rxd_ep, tx_entry,
+					 rma_iov, rma_count, rxd_flags);
+	if (!tx_entry) {
+		ret = -FI_EAGAIN;
+		goto out;
+	}
 	ret = rxd_ep_send_op(rxd_ep, tx_entry, rma_iov, rma_count, NULL, 0, 0, 0);
 	if (ret)
 		rxd_tx_entry_free(rxd_ep, tx_entry);
