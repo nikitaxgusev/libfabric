@@ -80,6 +80,10 @@ static ssize_t rxd_generic_atomic(struct rxd_ep *rxd_ep,
 				     data, 0, context, rxd_addr, op, rxd_flags);
 	if (!tx_entry)
 		goto out;
+	
+	/*tx_entry = rxd_tx_entry_init_atomic(rxd_ep, tx_entry);
+	if (!tx_entry)
+		goto out;*/
 
 	ret = rxd_ep_send_op(rxd_ep, tx_entry, rma_iov, rma_count, comp_iov,
 			     compare_count, datatype, atomic_op);
@@ -183,6 +187,10 @@ static ssize_t rxd_atomic_inject(struct fid_ep *ep_fid, const void *buf,
 				     RXD_INJECT | RXD_NO_TX_COMP);
 	if (!tx_entry)
 		goto out;
+        
+    /*tx_entry = rxd_tx_entry_init_atomic(rxd_ep, tx_entry);
+	if (!tx_entry)
+		goto out;*/
 
 	ret = rxd_ep_send_op(rxd_ep, tx_entry, &rma_iov, 1, NULL, 0, datatype, op);
 	if (ret)

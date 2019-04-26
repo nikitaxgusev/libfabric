@@ -338,6 +338,10 @@ ssize_t rxd_ep_generic_inject(struct rxd_ep *rxd_ep, const struct iovec *iov,
 		goto out;
 	}
 
+	tx_entry = rxd_tx_entry_init_tagged(rxd_ep,tx_entry);
+	if (!tx_entry)
+		goto out;
+		
 	ret = rxd_ep_send_op(rxd_ep, tx_entry, NULL, 0, NULL, 0, 0, 0);
 	if (ret)
 		rxd_tx_entry_free(rxd_ep, tx_entry);
@@ -376,6 +380,11 @@ ssize_t rxd_ep_generic_sendmsg(struct rxd_ep *rxd_ep, const struct iovec *iov,
 				     data, tag, context, rxd_addr, op, rxd_flags);
 	if (!tx_entry)
 		goto out;
+
+	tx_entry = rxd_tx_entry_init_tagged(rxd_ep,tx_entry);
+	if (!tx_entry) {
+		goto out;
+	}
 
 	ret = rxd_ep_send_op(rxd_ep, tx_entry, NULL, 0, NULL, 0, 0, 0);
 	if (ret)

@@ -427,6 +427,13 @@ void rxd_unpack_hdrs(size_t pkt_size, struct rxd_base_hdr *base_hdr,
 		     struct rxd_data_hdr **data_hdr, struct rxd_rma_hdr **rma_hdr,
 		     struct rxd_atom_hdr **atom_hdr, void **msg, size_t *msg_size);
 
+/* Init specific entry*/
+struct rxd_x_entry *rxd_tx_entry_init_rma(struct rxd_ep *ep, struct rxd_x_entry *tx_entry,
+                                          const struct fi_rma_iov *rma_iov, size_t rma_count,
+                                          uint32_t flags);
+struct rxd_x_entry *rxd_tx_entry_init_tagged(struct rxd_ep *ep, struct rxd_x_entry *tx_entry);
+struct rxd_x_entry *rxd_tx_entry_init_atomic(struct rxd_ep *ep, struct rxd_x_entry *tx_entry);		
+
 /* Tx/Rx entry sub-functions */
 struct rxd_x_entry *rxd_tx_entry_init(struct rxd_ep *ep, const struct iovec *iov,
 				      size_t iov_count, const struct iovec *res_iov,
