@@ -358,7 +358,7 @@ struct rxd_x_entry *rxd_tx_entry_init(struct rxd_ep *ep, const struct iovec *iov
 	struct rxd_x_entry *tx_entry;
 	struct rxd_domain *rxd_domain = rxd_ep_domain(ep);
 	size_t max_inline;
-
+	printf("entry_init\n");
 	tx_entry = rxd_get_tx_entry(ep, op);
 	if (!tx_entry) {
 		FI_WARN(&rxd_prov, FI_LOG_EP_CTRL, "could not get tx entry\n");
@@ -385,43 +385,6 @@ struct rxd_x_entry *rxd_tx_entry_init(struct rxd_ep *ep, const struct iovec *iov
 	tx_entry->cq_entry.tag = tag;
 
 	tx_entry->pkt = NULL;
-
-	max_inline = rxd_domain->max_inline_msg;
-	if (tx_entry->cq_entry.flags & FI_RMA)
-		max_inline -= sizeof(struct ofi_rma_iov) * rma_count;
-
-	if (tx_entry->flags & RXD_TAG_HDR)
-		max_inline -= sizeof(tx_entry->cq_entry.tag);
-	if (tx_entry->flags & RXD_REMOTE_CQ_DATA) {
-		max_inline -= sizeof(tx_entry->cq_entry.data);
-		tx_entry->cq_entry.data = data;
-	}
-
-	if (rma_count > 1 || tx_entry->cq_entry.flags & FI_READ ||
-	    tx_entry->cq_entry.len > max_inline)
-		max_inline -= sizeof(struct rxd_sar_hdr);
-	else
-		tx_entry->flags |= RXD_INLINE;
-
-	if (tx_entry->cq_entry.flags & FI_ATOMIC || tx_entry->cq_entry.len <= max_inline)
-		tx_entry->num_segs = 1;
-	else if (tx_entry->cq_entry.flags & FI_READ)
-		tx_entry->num_segs = ofi_div_ceil(tx_entry->cq_entry.len,
-						  rxd_domain->max_seg_sz);
-	else
-		tx_entry->num_segs = ofi_div_ceil(tx_entry->cq_entry.len - max_inline,
-						  rxd_domain->max_seg_sz) + 1;
-
-	if ((tx_entry->op == RXD_READ_REQ || tx_entry->op == RXD_ATOMIC_FETCH ||
-	     tx_entry->op == RXD_ATOMIC_COMPARE) &&
-	    ep->peers[tx_entry->peer].unacked_cnt < ep->peers[tx_entry->peer].tx_window &&
-	    ep->peers[tx_entry->peer].peer_addr != FI_ADDR_UNSPEC)
-		dlist_insert_tail(&tx_entry->entry,
-				  &ep->peers[tx_entry->peer].rma_rx_list);
-	else
-		dlist_insert_tail(&tx_entry->entry,
-				  &ep->peers[tx_entry->peer].tx_list);
-
 	return tx_entry;
 }
 
@@ -477,7 +440,7 @@ ssize_t rxd_ep_post_data_pkts(struct rxd_ep *ep, struct rxd_x_entry *tx_entry)
 	       ep->peers[tx_entry->peer].tx_window;
 }
 
-int rxd_ep_send_pkt(struct rxd_ep *ep, struct rxd_pkt_entry *pkt_entry)
+int 	rxd_ep_send_pkt(struct rxd_ep *ep, struct rxd_pkt_entry *pkt_entry)
 {
 	int ret;
 
@@ -497,7 +460,7 @@ int rxd_ep_send_pkt(struct rxd_ep *ep, struct rxd_pkt_entry *pkt_entry)
 		pkt_entry->flags |= RXD_PKT_IN_USE;
 		ep->pending_cnt++;
 	}
-
+	printf("send_pkt\n");
 	return ret;
 }
 
@@ -634,54 +597,10 @@ int rxd_ep_send_op(struct rxd_ep *rxd_ep, struct rxd_x_entry *tx_entry,
 		   const struct iovec *comp_iov, size_t comp_count,
 		   enum fi_datatype datatype, enum fi_op atomic_op)
 {
-	struct rxd_pkt_entry *pkt_entry;
-	struct rxd_base_hdr *base_hdr;
-	int ret = 0;
-	size_t len;
-	void *ptr;
+	int ret;
 
-	pkt_entry = rxd_get_tx_pkt(rxd_ep);
-	if (!pkt_entry)
-		return -FI_ENOMEM;
-
-	base_hdr = rxd_get_base_hdr(pkt_entry);
-	ptr = (void *) base_hdr;
-	rxd_init_base_hdr(rxd_ep, &ptr, tx_entry);
-
-	if (!(tx_entry->flags & RXD_INLINE)) {
-		rxd_init_sar_hdr(&ptr, tx_entry, rma_count);
-	}
-	if (tx_entry->flags & RXD_TAG_HDR) {
-		rxd_init_tag_hdr(&ptr, tx_entry);
-	}
-	if (tx_entry->flags & RXD_REMOTE_CQ_DATA) {
-		rxd_init_data_hdr(&ptr, tx_entry);
-	}
-	if (tx_entry->cq_entry.flags & (FI_RMA | FI_ATOMIC)) {
-		rxd_init_rma_hdr(&ptr, rma_iov, rma_count);
-		if (tx_entry->cq_entry.flags & FI_ATOMIC) {
-			rxd_init_atom_hdr(&ptr, datatype, atomic_op);
-		}
-	}
-	if (tx_entry->op != RXD_READ_REQ && atomic_op != FI_ATOMIC_READ) {
-		tx_entry->bytes_done = rxd_init_msg(&ptr, tx_entry->iov,
-						    tx_entry->iov_count,
-						    tx_entry->cq_entry.len,
-						    rxd_avail_buf(rxd_ep, base_hdr, ptr));
-		if (tx_entry->op == RXD_ATOMIC_COMPARE) {
-			len = rxd_init_msg(&ptr, comp_iov, comp_count,
-					   tx_entry->cq_entry.len,
-					   rxd_avail_buf(rxd_ep, base_hdr, ptr));
-			if (len != tx_entry->bytes_done) {
-				FI_WARN(&rxd_prov, FI_LOG_EP_CTRL,
-					"compare data length mismatch\n");
-			}
-		}
-	}
-
-	pkt_entry->peer = tx_entry->peer;
-	pkt_entry->pkt_size = ((char *) ptr - (char *) base_hdr) + rxd_ep->tx_prefix_size;
-
+	/*Here is we're getting a pkt from tx_entry*/
+	struct rxd_pkt_entry *pkt_entry = tx_entry->pkt;
 	if (rxd_ep->peers[tx_entry->peer].unacked_cnt <
 	    rxd_ep->peers[tx_entry->peer].tx_window &&
 	    rxd_ep->peers[tx_entry->peer].peer_addr != FI_ADDR_UNSPEC) {
@@ -694,10 +613,7 @@ int rxd_ep_send_op(struct rxd_ep *rxd_ep, struct rxd_x_entry *tx_entry,
 		rxd_insert_unacked(rxd_ep, tx_entry->peer, pkt_entry);
 		if (tx_entry->op != RXD_READ_REQ && tx_entry->num_segs > 1)
 			ret = rxd_ep_post_data_pkts(rxd_ep, tx_entry);
-	} else {
-		tx_entry->pkt = pkt_entry;
-	}
-
+	} 
 	return ret == -FI_ENOMEM ? ret : 0;
 }
 
@@ -1321,4 +1237,49 @@ err2:
 err1:
 	free(rxd_ep);
 	return ret;
+}
+
+struct rxd_x_entry *rxd_tx_entry_init_rma(struct rxd_ep *ep,
+		struct rxd_x_entry *tx_entry, const struct fi_rma_iov *rma_iov,
+		size_t rma_count, uint32_t flags) {
+
+	struct rxd_pkt_entry *pkt_entry;
+	struct rxd_base_hdr *base_hdr;
+	size_t max_inline;
+	void *ptr;
+	int ret;
+
+	struct rxd_domain *rxd_domain = rxd_ep_domain(ep);
+	max_inline = rxd_domain->max_inline_msg;
+
+	max_inline -= sizeof(struct ofi_rma_iov) * rma_count;
+	tx_entry->num_segs = ofi_div_ceil(tx_entry->cq_entry.len - max_inline,
+					  rxd_domain->max_seg_sz) + 1;
+
+	pkt_entry = rxd_get_tx_pkt(ep);
+	if (!pkt_entry)
+		return -FI_ENOMEM;
+
+	
+	dlist_insert_tail(&tx_entry->entry,
+			  &ep->peers[tx_entry->peer].tx_list);
+
+	base_hdr = rxd_get_base_hdr(pkt_entry);
+	ptr = (void *) base_hdr;
+	rxd_init_base_hdr(ep, &ptr, tx_entry);
+
+	if (tx_entry->flags & RXD_REMOTE_CQ_DATA) {
+		rxd_init_data_hdr(&ptr, tx_entry);
+	}
+	printf("RMA_init\n");
+	if (tx_entry->cq_entry.flags & FI_RMA) {
+		rxd_init_rma_hdr(&ptr, rma_iov, rma_count);
+	}
+
+	pkt_entry->peer = tx_entry->peer;
+	pkt_entry->pkt_size = ((char *) ptr - (char *) base_hdr) + ep->tx_prefix_size;
+	
+	/*saving a created pkt into tx_entry*/
+	tx_entry->pkt = pkt_entry;
+	return tx_entry;
 }

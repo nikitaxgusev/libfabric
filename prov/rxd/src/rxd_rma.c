@@ -66,9 +66,10 @@ static ssize_t rxd_generic_write_inject(struct rxd_ep *rxd_ep,
 		goto out;
 	}
 
-	ret = rxd_ep_send_op(rxd_ep, tx_entry, rma_iov, rma_count, NULL, 0, 0, 0);
-	if (ret) {
-		rxd_tx_entry_free(rxd_ep, tx_entry);
+	tx_entry = rxd_tx_entry_init_rma(rxd_ep, tx_entry,
+					 rma_iov, rma_count, rxd_flags);
+	if (!tx_entry) {
+		ret = -FI_EAGAIN;
 		goto out;
 	}
 
@@ -114,11 +115,20 @@ ssize_t rxd_generic_rma(struct rxd_ep *rxd_ep, const struct iovec *iov,
 		ret = -FI_EAGAIN;
 		goto out;
 	}
-
+	printf("RMA_generic_calling\n");
+	printf("RMA_generic_calling\n");
+	tx_entry = rxd_tx_entry_init_rma(rxd_ep, tx_entry,
+					 rma_iov, rma_count, rxd_flags);
+	if (!tx_entry) {
+		ret = -FI_EAGAIN;
+		goto out;
+	}
 	ret = rxd_ep_send_op(rxd_ep, tx_entry, rma_iov, rma_count, NULL, 0, 0, 0);
-	if (ret)
+	
+	if (ret){
 		rxd_tx_entry_free(rxd_ep, tx_entry);
-
+	}
+		
 out:
 	fastlock_release(&rxd_ep->util_ep.lock);
 	return ret;
