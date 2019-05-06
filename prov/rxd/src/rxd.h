@@ -435,7 +435,8 @@ void rxd_init_atom_hdr(void **ptr, enum fi_datatype datatype,
 		       enum fi_op atomic_op);
 size_t rxd_init_msg(void **ptr, const struct iovec *iov, size_t iov_count,
 		    size_t total_len, size_t avail_len);
-
+size_t rxd_check_init_cq_data(void *ptr, struct rxd_x_entry *tx_entry,
+			      size_t max_inline);
 /* Tx/Rx entry sub-functions */
 struct rxd_x_entry *rxd_tx_entry_init_common(struct rxd_ep *ep, fi_addr_t addr,
 			uint32_t op, const struct iovec *iov, size_t iov_count,

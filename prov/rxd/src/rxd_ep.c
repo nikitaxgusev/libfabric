@@ -1209,3 +1209,10 @@ err1:
 	free(rxd_ep);
 	return ret;
 }
+
+size_t rxd_check_init_cq_data(void *ptr, struct rxd_x_entry *tx_entry,
+			      size_t max_inline)
+{
+	rxd_init_data_hdr(&ptr, tx_entry);
+	return max_inline -= sizeof(tx_entry->cq_entry.data);
+}
