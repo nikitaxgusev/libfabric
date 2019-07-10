@@ -1012,6 +1012,7 @@ out:
 
 static int rxd_buf_region_alloc_fn(struct ofi_bufpool_region *region)
 {
+	//struct rxd_pkt_entry *pkt_entry = NULL;
 	struct rxd_domain *domain = region->pool->attr.context;
 	struct fid_mr *mr;
 	int ret;
@@ -1020,6 +1021,8 @@ static int rxd_buf_region_alloc_fn(struct ofi_bufpool_region *region)
 			region->pool->region_size,
 			FI_SEND | FI_RECV, 0, 0, 0, &mr, NULL);
 	region->context = mr;
+	//pkt_entry->mr = mr;
+	//rxd_set_rx_pkt(ep, pkt_entry);
 	return ret;
 }
 
