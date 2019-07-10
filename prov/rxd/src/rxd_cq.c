@@ -623,7 +623,7 @@ static struct rxd_x_entry *rxd_rma_rx_entry_init(struct rxd_ep *ep,
 	if (ret)
 		return NULL;
 
-	rx_entry = rxd_rx_entry_init(ep, iov, iov_count, 0, 0, NULL,
+	rx_entry = rxd_rx_entry_init_common(ep, iov, iov_count, 0, 0, NULL,
 				     base_hdr->peer, base_hdr->type,
 				     base_hdr->flags);
 	if (!rx_entry)

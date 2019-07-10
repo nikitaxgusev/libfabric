@@ -213,7 +213,7 @@ struct fi_ops_ep rxd_ops_ep = {
 	.tx_size_left = fi_no_tx_size_left,
 };
 
-struct rxd_x_entry *rxd_rx_entry_init(struct rxd_ep *ep,
+struct rxd_x_entry *rxd_rx_entry_init_common(struct rxd_ep *ep,
 			const struct iovec *iov, size_t iov_count, uint64_t tag,
 			uint64_t ignore, void *context, fi_addr_t addr,
 			uint32_t op, uint32_t flags)
