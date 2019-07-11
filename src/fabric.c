@@ -52,6 +52,12 @@
 #include <dlfcn.h>
 #endif
 
+/* WORKAROUND BEGIN */
+#ifndef _WIN32
+#include <glob.h>
+#endif /* !_WIN32 */
+/* WORKAROUND END */
+
 struct ofi_prov {
 	struct ofi_prov		*next;
 	char			*prov_name;
@@ -961,6 +967,21 @@ try_again:
 		if ((0 == strcmp(prov->provider->name, "ofi_rxm")) ||
 		    (0 == strcmp(prov->provider->name, "ofi_rxd")))
 			continue;
+
+		/* WORKAROUND BEGIN */
+#ifndef _WIN32
+		if (0 == strcmp(prov->provider->name, "psm2")) {
+			glob_t glob_buf;
+
+			if ((glob("/dev/hfi[0-9]_[0-9]", 0, NULL, &glob_buf) != 0) &&
+				(glob("/dev/hfi[0-9]_[0-9][0-9]", GLOB_APPEND, NULL, &glob_buf) != 0)) {
+				continue;
+			}
+			globfree(&glob_buf);
+		}
+#endif /* !_WIN32 */
+		/* WORKAROUND END */
+
 		real_prov_head = prov;
 	}
 
