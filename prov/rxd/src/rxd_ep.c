@@ -48,9 +48,9 @@ struct rxd_pkt_entry *rxd_get_tx_pkt(struct rxd_ep *ep)
 	if (!pkt_entry)
 		return NULL;
 
-	pkt_entry->mr = (struct fid_mr *) mr;
+	//pkt_entry->mr = (struct fid_mr *) mr;
 	pkt_entry->flags = 0;
-	rxd_set_tx_pkt(ep, pkt_entry);
+	//rxd_set_tx_pkt(ep, pkt_entry);
 
 	return pkt_entry;
 }
@@ -67,8 +67,8 @@ static struct rxd_pkt_entry *rxd_get_rx_pkt(struct rxd_ep *ep)
 	if (!pkt_entry)
 		return NULL;
 
-	pkt_entry->mr = (struct fid_mr *) mr;
-	rxd_set_rx_pkt(ep, pkt_entry);
+	//pkt_entry->mr = (struct fid_mr *) mr;
+	//rxd_set_rx_pkt(ep, pkt_entry);
 
 	return pkt_entry;
 }
@@ -248,11 +248,6 @@ struct rxd_x_entry *rxd_rx_entry_init(struct rxd_ep *ep,
 	return rx_entry;
 }
 
-static inline void *rxd_mr_desc(struct fid_mr *mr, struct rxd_ep *ep)
-{
-	return (ep->do_local_mr) ? fi_mr_desc(mr) : NULL;
-}
-
 int rxd_ep_post_buf(struct rxd_ep *ep)
 {
 	struct rxd_pkt_entry *pkt_entry;
@@ -264,8 +259,8 @@ int rxd_ep_post_buf(struct rxd_ep *ep)
 
 	ret = fi_recv(ep->dg_ep, rxd_pkt_start(pkt_entry),
 		      rxd_ep_domain(ep)->max_mtu_sz,
-		      rxd_mr_desc(pkt_entry->mr, ep),
-		      FI_ADDR_UNSPEC, &pkt_entry->context);
+		      pkt_entry->desc,FI_ADDR_UNSPEC,
+		      &pkt_entry->context);
 	if (ret) {
 		ofi_buf_free(pkt_entry);
 		FI_WARN(&rxd_prov, FI_LOG_EP_CTRL, "failed to repost\n");
@@ -444,7 +439,7 @@ int rxd_ep_send_pkt(struct rxd_ep *ep, struct rxd_pkt_entry *pkt_entry)
 	pkt_entry->timestamp = fi_gettime_ms();
 
 	ret = fi_send(ep->dg_ep, (const void *) rxd_pkt_start(pkt_entry),
-		      pkt_entry->pkt_size, rxd_mr_desc(pkt_entry->mr, ep),
+		      pkt_entry->pkt_size, pkt_entry->desc,
 		      rxd_ep_av(ep)->rxd_addr_table[pkt_entry->peer].dg_addr,
 		      &pkt_entry->context);
 	if (ret) {
@@ -1010,9 +1005,46 @@ out:
 	fastlock_release(&ep->util_ep.lock);
 }
 
+static void rxd_buf_region_init_fn(struct ofi_bufpool_region *region, void *buf)
+{
+	struct rxd_pkt_entry *pkt_entry = (struct rxd_pkt_entry *) buf;
+	struct rxd_ep *ep = (struct rxd_ep *) region->pool->attr.context;
+	struct rxd_buf_pool *pool = (struct rxd_buf_pool *) region->pool;
+	void *mr = NULL;
+
+	if (ep->do_local_mr) {
+		pkt_entry->desc = fi_mr_desc((struct fid_mr *) region->context);
+	} else {
+		pkt_entry->desc = NULL;
+	}
+
+	pkt_entry->mr = (struct fid_mr *) region->context;
+	if(pool->type == RXD_BUF_POOL_RX) {
+		rxd_set_rx_pkt(ep, pkt_entry);
+	} else {
+		rxd_set_tx_pkt(ep, pkt_entry);
+	}
+}
+
+static void rxd_buf_entries_init_fn(struct ofi_bufpool_region *region, void *buf)
+{
+	struct rxd_x_entry *entry;
+	struct rxd_buf_pool *pool = (struct rxd_buf_pool *) region->pool;
+	struct rxd_ep *ep = (struct rxd_ep *) region->pool->attr.context;
+
+	entry = ofi_ibuf_alloc(ep->tx_entry_pool); 
+
+	if(pool->type == RXD_BUF_POOL_RX) {
+		entry->tx_id = ofi_buf_index(ep->tx_entry_pool);
+	} else {
+		entry->tx_id = ofi_buf_index(ep->rx_entry_pool);
+	}
+}
+
 static int rxd_buf_region_alloc_fn(struct ofi_bufpool_region *region)
 {
-	struct rxd_domain *domain = region->pool->attr.context;
+	struct rxd_domain *domain = rxd_ep_domain((struct rxd_ep *)
+						   region->pool->attr.context);
 	struct fid_mr *mr;
 	int ret;
 
@@ -1040,7 +1072,8 @@ int rxd_ep_init_res(struct rxd_ep *ep, struct fi_info *fi_info)
 	pkt_attr.chunk_cnt = RXD_TX_POOL_CHUNK_CNT;
 	pkt_attr.alloc_fn = ep->do_local_mr ? rxd_buf_region_alloc_fn : NULL;
 	pkt_attr.free_fn = ep->do_local_mr ? rxd_buf_region_free_fn : NULL;
-	pkt_attr.context = rxd_domain;
+	pkt_attr.context = ep;
+	pkt_attr.init_fn = rxd_buf_region_init_fn;
 	pkt_attr.flags = OFI_BUFPOOL_HUGEPAGES;
 
 	ret = ofi_bufpool_create_attr(&pkt_attr, &ep->tx_pkt_pool);
@@ -1056,6 +1089,7 @@ int rxd_ep_init_res(struct rxd_ep *ep, struct fi_info *fi_info)
 	entry_attr.alignment = RXD_BUF_POOL_ALIGNMENT;
 	entry_attr.max_cnt = (size_t) ((uint16_t) (~0));
 	entry_attr.chunk_cnt = ep->tx_size;
+	entry_attr.init_fn = rxd_buf_entries_init_fn;
 	entry_attr.flags = OFI_BUFPOOL_INDEXED | OFI_BUFPOOL_NO_TRACK |
 			   OFI_BUFPOOL_HUGEPAGES;
 
