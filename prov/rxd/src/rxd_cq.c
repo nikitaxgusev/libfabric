@@ -348,13 +348,14 @@ static int rxd_send_cts(struct rxd_ep *rxd_ep, struct rxd_rts_pkt *rts_pkt,
 
 	rxd_update_peer(rxd_ep, peer, rts_pkt->rts_addr);
 
-	pkt_entry = rxd_get_tx_pkt(rxd_ep);
+	pkt_entry = ofi_buf_alloc(rxd_ep->tx_pkt_pool.pool);
 	if (!pkt_entry)
 		return -FI_ENOMEM;
 
 	cts = (struct rxd_cts_pkt *) (pkt_entry->pkt);
 	pkt_entry->pkt_size = sizeof(*cts) + rxd_ep->tx_prefix_size;
 	pkt_entry->peer = peer;
+	pkt_entry->flags = 0;
 
 	cts->base_hdr.version = RXD_PROTOCOL_VERSION;
 	cts->base_hdr.type = RXD_CTS;
@@ -649,7 +650,7 @@ static struct rxd_x_entry *rxd_rx_atomic_fetch(struct rxd_ep *ep,
 		return NULL;
 	}
 
-	rx_entry->pkt = rxd_get_tx_pkt(ep);
+	rx_entry->pkt = ofi_buf_alloc(ep->tx_pkt_pool.pool);
 	if (!rx_entry->pkt) {
 		FI_WARN(&rxd_prov, FI_LOG_EP_CTRL, "could not get pkt\n");
 		rxd_rx_entry_free(ep, rx_entry);
