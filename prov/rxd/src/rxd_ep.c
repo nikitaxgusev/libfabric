@@ -36,20 +36,6 @@
 #include <ofi_iov.h>
 #include "rxd.h"
 
-struct rxd_pkt_entry *rxd_get_tx_pkt(struct rxd_ep *ep)
-{
-	struct rxd_pkt_entry *pkt_entry;
-
-	pkt_entry = ofi_buf_alloc(ep->tx_pkt_pool.pool);
-
-	if (!pkt_entry)
-		return NULL;
-
-	pkt_entry->flags = 0;
-
-	return pkt_entry;
-}
-
 struct rxd_x_entry *rxd_get_tx_entry(struct rxd_ep *ep, uint32_t op)
 {
 	struct rxd_x_entry *tx_entry;
@@ -331,7 +317,7 @@ struct rxd_x_entry *rxd_tx_entry_init_common(struct rxd_ep *ep, fi_addr_t addr,
 		return NULL;
 	}
 
-	tx_entry->pkt = rxd_get_tx_pkt(ep);
+	tx_entry->pkt = ofi_buf_alloc(ep->tx_pkt_pool.pool);
 	if (!tx_entry->pkt) {
 		rxd_tx_entry_free(ep, tx_entry);
 		return NULL;
@@ -387,7 +373,7 @@ ssize_t rxd_ep_post_data_pkts(struct rxd_ep *ep, struct rxd_x_entry *tx_entry)
 		    ep->peers[tx_entry->peer].tx_window)
 			return 0;
 
-		pkt_entry = rxd_get_tx_pkt(ep);
+		pkt_entry = ofi_buf_alloc(ep->tx_pkt_pool.pool);
 		if (!pkt_entry)
 			return -FI_ENOMEM;
 
@@ -434,13 +420,14 @@ static ssize_t rxd_ep_send_rts(struct rxd_ep *rxd_ep, fi_addr_t rxd_addr)
 	ssize_t ret;
 	size_t addrlen;
 
-	pkt_entry = rxd_get_tx_pkt(rxd_ep);
+	pkt_entry = ofi_buf_alloc(rxd_ep->tx_pkt_pool.pool);
 	if (!pkt_entry)
 		return -FI_ENOMEM;
 
 	rts_pkt = (struct rxd_rts_pkt *) (pkt_entry->pkt);
 	pkt_entry->pkt_size = sizeof(*rts_pkt) + rxd_ep->tx_prefix_size;
 	pkt_entry->peer = rxd_addr;
+	pkt_entry->flags = 0;
 
 	rts_pkt->base_hdr.version = RXD_PROTOCOL_VERSION;
 	rts_pkt->base_hdr.type = RXD_RTS;
@@ -553,7 +540,7 @@ void rxd_ep_send_ack(struct rxd_ep *rxd_ep, fi_addr_t peer)
 	struct rxd_pkt_entry *pkt_entry;
 	struct rxd_ack_pkt *ack;
 
-	pkt_entry = rxd_get_tx_pkt(rxd_ep);
+	pkt_entry = ofi_buf_alloc(rxd_ep->tx_pkt_pool.pool);
 	if (!pkt_entry) {
 		FI_WARN(&rxd_prov, FI_LOG_EP_CTRL, "Unable to send ack\n");
 		return;
@@ -562,6 +549,7 @@ void rxd_ep_send_ack(struct rxd_ep *rxd_ep, fi_addr_t peer)
 	ack = (struct rxd_ack_pkt *) (pkt_entry->pkt);
 	pkt_entry->pkt_size = sizeof(*ack) + rxd_ep->tx_prefix_size;
 	pkt_entry->peer = peer;
+	pkt_entry->flags = 0;
 
 	ack->base_hdr.version = RXD_PROTOCOL_VERSION;
 	ack->base_hdr.type = RXD_ACK;
