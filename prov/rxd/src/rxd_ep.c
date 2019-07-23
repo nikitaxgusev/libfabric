@@ -317,6 +317,8 @@ void rxd_init_data_pkt(struct rxd_ep *ep, struct rxd_x_entry *tx_entry,
 	tx_entry->bytes_done += pkt_entry->pkt_size;
 
 	pkt_entry->pkt_size += sizeof(*data_pkt) + ep->tx_prefix_size;
+
+	pkt_entry->flags = 0;
 }
 
 struct rxd_x_entry *rxd_tx_entry_init_common(struct rxd_ep *ep, fi_addr_t addr,
@@ -331,7 +333,7 @@ struct rxd_x_entry *rxd_tx_entry_init_common(struct rxd_ep *ep, fi_addr_t addr,
 		return NULL;
 	}
 
-	tx_entry->pkt = rxd_get_tx_pkt(ep);
+	tx_entry->pkt = ofi_buf_alloc(ep->tx_pkt_pool.pool);
 	if (!tx_entry->pkt) {
 		rxd_tx_entry_free(ep, tx_entry);
 		return NULL;
@@ -387,7 +389,7 @@ ssize_t rxd_ep_post_data_pkts(struct rxd_ep *ep, struct rxd_x_entry *tx_entry)
 		    ep->peers[tx_entry->peer].tx_window)
 			return 0;
 
-		pkt_entry = rxd_get_tx_pkt(ep);
+		pkt_entry = ofi_buf_alloc(ep->tx_pkt_pool.pool);
 		if (!pkt_entry)
 			return -FI_ENOMEM;
 

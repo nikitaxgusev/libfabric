@@ -649,7 +649,7 @@ static struct rxd_x_entry *rxd_rx_atomic_fetch(struct rxd_ep *ep,
 		return NULL;
 	}
 
-	rx_entry->pkt = rxd_get_tx_pkt(ep);
+	rx_entry->pkt = ofi_buf_alloc(ep->tx_pkt_pool.pool);
 	if (!rx_entry->pkt) {
 		FI_WARN(&rxd_prov, FI_LOG_EP_CTRL, "could not get pkt\n");
 		rxd_rx_entry_free(ep, rx_entry);
@@ -659,7 +659,6 @@ static struct rxd_x_entry *rxd_rx_atomic_fetch(struct rxd_ep *ep,
 
 	rx_entry->op = RXD_DATA_READ;
 	rx_entry->peer = base_hdr->peer;
-	rx_entry->flags = RXD_NO_TX_COMP;
 	rx_entry->bytes_done = 0;
 	rx_entry->next_seg_no = 0;
 	rx_entry->num_segs = 1;
@@ -678,6 +677,8 @@ static struct rxd_x_entry *rxd_rx_atomic_fetch(struct rxd_ep *ep,
 		FI_WARN(&rxd_prov, FI_LOG_EP_CTRL, "fetch data length mismatch\n");
 
 	dlist_insert_tail(&rx_entry->entry, &ep->peers[rx_entry->peer].tx_list);
+
+	rx_entry->flags = RXD_NO_TX_COMP;
 
 	rxd_ep_send_ack(ep, base_hdr->peer);
 
