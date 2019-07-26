@@ -36,7 +36,7 @@
 #include <ofi_mem_hooks.h>
 
 static struct ofi_uffd uffd;
-static struct ofi_patcher patcher;
+struct ofi_patcher patcher;
 
 struct ofi_mem_monitor *uffd_monitor	= &uffd.monitor;
 struct ofi_mem_monitor *patcher_monitor = &patcher.monitor;
@@ -109,12 +109,12 @@ int ofi_monitor_add_cache(struct ofi_mem_monitor *monitor,
 	fastlock_acquire(&monitor->lock);
 	if (dlist_empty(&monitor->list)) {
 
-		if(monitor == uffd_monitor)
+		if (monitor == uffd_monitor)
 			ret = ofi_uffd_init();
 		else
 			ret = -FI_ENOSYS;
 
-		if(monitor == patcher_monitor)
+		if (monitor == patcher_monitor)
 			ret = ofi_patcher_init();
 		else
 			ret = -FI_ENOSYS;
@@ -155,7 +155,7 @@ void ofi_monitor_notify(struct ofi_mem_monitor *monitor,
 	struct ofi_mr_cache *cache;
 
 	dlist_foreach_container(&monitor->list, struct ofi_mr_cache,
-			cache, notify_entry) {
+				cache, notify_entry) {
 		ofi_mr_cache_notify(cache, addr, len);
 	}
 }
@@ -372,8 +372,6 @@ void ofi_uffd_cleanup(void)
 
 #endif /* HAVE_UFFD_UNMAP */
 
-//#if /**/
-
 void ofi_patcher_handler(const void *addr, size_t len)
 {
 	fastlock_acquire(&patcher.lock);
@@ -382,9 +380,9 @@ void ofi_patcher_handler(const void *addr, size_t len)
 }
 
 static int ofi_patcher_subscribe(struct ofi_mem_monitor *monitor,
-			         const void *addr, size_t len)
+				 const void *addr, size_t len)
 {
-	return 0;
+	return FI_SUCCESS;
 }
 
 static void ofi_patcher_unsubscribe(struct ofi_mem_monitor *monitor,
