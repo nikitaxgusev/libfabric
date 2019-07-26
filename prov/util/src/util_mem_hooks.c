@@ -49,7 +49,6 @@ ofi_patcher_get_phdr_dynamic(const ElfW(Phdr) *phdr,
 	return NULL;
 }
 
-
 static void *ofi_patcher_get_dynentry(ElfW(Addr) base, const ElfW(Phdr) *pdyn,
 						             ElfW(Sxword) type)
 {
@@ -71,11 +70,11 @@ static void * ofi_patcher_get_got_entry (ElfW(Addr) base, const ElfW(Phdr) *phdr
 	ElfW(Sym)  *symtab;
 	size_t pltrelsz;
 
-	dphdr = ofi_patcher_get_phdr_dynamic (phdr, phnum, phent);
-	jmprel = ofi_patcher_get_dynentry (base, dphdr, DT_JMPREL);
-	symtab = (ElfW(Sym) *) ofi_patcher_get_dynentry (base, dphdr, DT_SYMTAB);
+	dphdr = ofi_patcher_get_phdr_dynamic(phdr, phnum, phent);
+	jmprel = ofi_patcher_get_dynentry(base, dphdr, DT_JMPREL);
+	symtab = (ElfW(Sym) *) ofi_patcher_get_dynentry(base, dphdr, DT_SYMTAB);
 	strtab = ofi_patcher_get_dynentry (base, dphdr, DT_STRTAB);
-	pltrelsz = (size_t) (uintptr_t) ofi_patcher_get_dynentry (base, dphdr, DT_PLTRELSZ);
+	pltrelsz = (size_t) (uintptr_t) ofi_patcher_get_dynentry(base, dphdr, DT_PLTRELSZ);
 
 	for (ElfW(Rela) *reloc = jmprel; (intptr_t) reloc < (intptr_t) jmprel + pltrelsz; ++reloc) {
 		if (sizeof(void*) == 8)
@@ -284,13 +283,12 @@ unlock:
 	return ret;
 }
 
-
-/* calling __syscall is preferred on some systems when some
- * arguments may be 64-bit. it also has the benefit of having
- * an off_t return type */
+/*
+ * Implementations of syscalls: SYS_mmap, SYS_unmap
+ */
 #define memory_patcher_syscall syscall
 
-/*SYS_MMAP*/
+/* SYS_MMAP */
 #if defined (SYS_mmap)
 
 static void *(*original_mmap)(void *, size_t, int, int, int, off_t);
@@ -302,12 +300,12 @@ static void *_intercept_mmap(void *start, size_t length,
 
 	ofi_patcher_handler(start, length);
 
-	if (!original_mmap) {
-		result = (void*)(intptr_t) memory_patcher_syscall(SYS_mmap, start, length,
-								  prot, flags, fd, offset);
-	} else {
-		result = original_mmap (start, length, prot, flags, fd, offset);
-	}
+	if (!original_mmap)
+		result = (void*)(intptr_t) memory_patcher_syscall(SYS_mmap,
+							start, length,prot,
+							flags, fd, offset);
+	else
+		result = original_mmap(start, length, prot, flags, fd, offset);
 
 	return result;
 }
@@ -322,7 +320,7 @@ static void *intercept_mmap(void *start, size_t
 
 #endif
 
-/*SYS_MUNMAP*/
+/* SYS_MUNMAP */
 #if defined (SYS_munmap)
 
 static int (*original_munmap) (void *, size_t);
@@ -333,11 +331,10 @@ static int _intercept_munmap(void *start, size_t length)
 
 	ofi_patcher_handler(start, length);
 
-	if (!original_munmap) {
+	if (!original_munmap)
 		result = memory_patcher_syscall(SYS_munmap, start, length);
-	} else {
+	else
 		result = original_munmap(start, length);
-	}
 
 	return result;
 }
