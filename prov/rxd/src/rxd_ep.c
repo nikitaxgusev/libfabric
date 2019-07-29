@@ -957,7 +957,10 @@ void rxd_ep_progress(struct util_ep *util_ep)
 		}
 
 		if (cq_entry.flags & FI_RECV)
+		{
 			rxd_handle_recv_comp(ep, &cq_entry);
+			ep->processed_recvs++;
+		}
 		else
 			rxd_handle_send_comp(ep, &cq_entry);
 	}

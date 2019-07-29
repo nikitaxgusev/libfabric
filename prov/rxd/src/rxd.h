@@ -199,7 +199,7 @@ struct rxd_ep {
 	int dg_cq_fd;
 	uint32_t tx_flags;
 	uint32_t rx_flags;
-
+	int processed_recvs;
 	size_t tx_msg_avail;
 	size_t rx_msg_avail;
 	size_t tx_rma_avail;
