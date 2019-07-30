@@ -937,6 +937,7 @@ void rxd_ep_progress(struct util_ep *util_ep)
 	struct fi_cq_msg_entry cq_entry;
 	struct dlist_entry *tmp;
 	struct rxd_ep *ep;
+	int processed_recvs = 0;
 	ssize_t ret;
 	int i;
 
@@ -956,7 +957,10 @@ void rxd_ep_progress(struct util_ep *util_ep)
 		}
 
 		if (cq_entry.flags & FI_RECV)
+		{
+			processed_recvs++;
 			rxd_handle_recv_comp(ep, &cq_entry);
+		}
 		else
 			rxd_handle_send_comp(ep, &cq_entry);
 	}
@@ -977,6 +981,11 @@ void rxd_ep_progress(struct util_ep *util_ep)
 	}
 
 out:
+	for (i = 0; i < processed_recvs; i++) {
+		ret = rxd_ep_post_buf(ep);
+		if (ret)
+			break;
+	}
 	fastlock_release(&ep->util_ep.lock);
 }
 

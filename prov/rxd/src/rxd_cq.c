@@ -1153,7 +1153,7 @@ void rxd_handle_recv_comp(struct rxd_ep *ep, struct fi_cq_msg_entry *comp)
 	       "got recv completion (type: %s)\n",
 	       rxd_pkt_type_str[(rxd_pkt_type(pkt_entry))]);
 
-	rxd_ep_post_buf(ep);
+	/*rxd_ep_post_buf(ep);*/
 
 	pkt_entry->pkt_size = comp->len;
 	switch (rxd_pkt_type(pkt_entry)) {
