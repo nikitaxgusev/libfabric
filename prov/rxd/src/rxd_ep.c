@@ -232,10 +232,20 @@ int rxd_ep_post_buf(struct rxd_ep *ep)
 	if (!pkt_entry)
 		return -FI_ENOMEM;
 
-	ret = fi_recv(ep->dg_ep, rxd_pkt_start(pkt_entry),
-		      rxd_ep_domain(ep)->max_mtu_sz,
-		      pkt_entry->desc, FI_ADDR_UNSPEC,
-		      &pkt_entry->context);
+	struct iovec iov = {
+		.iov_base = rxd_pkt_start(pkt_entry),
+		.iov_len = rxd_ep_domain(ep)->max_mtu_sz,
+	};
+
+	struct fi_msg msg = {
+		.msg_iov = &iov,
+		.desc = &pkt_entry->desc,
+		.iov_count = 1,
+		.addr = FI_ADDR_UNSPEC,
+		.context = &pkt_entry->context,
+	};
+
+	ret = fi_recvmsg(ep->dg_ep, &msg, FI_MORE);
 	if (ret) {
 		ofi_buf_free(pkt_entry);
 		FI_WARN(&rxd_prov, FI_LOG_EP_CTRL, "failed to repost\n");
@@ -269,8 +279,8 @@ static int rxd_ep_enable(struct rxd_ep *ep)
 		if (ret)
 			break;
 	}
-
 	fastlock_release(&ep->util_ep.lock);
+
 	return 0;
 }
 
