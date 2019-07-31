@@ -303,6 +303,7 @@ struct rxd_pkt_entry {
 	struct fid_mr *mr;
 	void *desc;
 	fi_addr_t peer;
+	struct fi_msg msg;
 	void *pkt;
 };
 
