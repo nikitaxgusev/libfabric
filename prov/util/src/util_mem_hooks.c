@@ -384,7 +384,7 @@ static void *ofi_intercept_mremap(void *old_address, size_t old_size,
 		size_t new_size, int flags, void *new_address)
 {
 	FI_DBG(&core_prov, FI_LOG_MR,
-	       "intercepted mremap old_addr %p old_size %zu\n"
+	       "intercepted mremap old_addr %p old_size %zu\n",
 	       old_address, old_size);
 	ofi_intercept_handler(old_address, old_size);
 
