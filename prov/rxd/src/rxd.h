@@ -204,6 +204,9 @@ struct rxd_ep {
 	size_t tx_rma_avail;
 	size_t rx_rma_avail;
 
+	struct fi_msg rx_msg;
+	struct iovec rx_iov;
+
 	struct rxd_buf_pool tx_pkt_pool;
 	struct rxd_buf_pool rx_pkt_pool;
 	struct slist rx_pkt_list;

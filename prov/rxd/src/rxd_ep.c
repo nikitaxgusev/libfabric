@@ -232,10 +232,11 @@ int rxd_ep_post_buf(struct rxd_ep *ep)
 	if (!pkt_entry)
 		return -FI_ENOMEM;
 
-	ret = fi_recv(ep->dg_ep, rxd_pkt_start(pkt_entry),
-		      rxd_ep_domain(ep)->max_mtu_sz,
-		      pkt_entry->desc, FI_ADDR_UNSPEC,
-		      &pkt_entry->context);
+	ep->rx_iov.iov_base = rxd_pkt_start(pkt_entry);
+	ep->rx_msg.desc = &pkt_entry->desc;
+	ep->rx_msg.context = &pkt_entry->context;
+
+	ret = fi_recvmsg(ep->dg_ep, &ep->rx_msg,FI_MORE);
 	if (ret) {
 		ofi_buf_free(pkt_entry);
 		FI_WARN(&rxd_prov, FI_LOG_EP_CTRL, "failed to repost\n");
@@ -1009,7 +1010,7 @@ static void rxd_pkt_init_fn(struct ofi_bufpool_region *region, void *buf)
 	else
 		pkt_entry->desc = NULL;
 
- 	pkt_entry->mr = (struct fid_mr *) region->context;
+	pkt_entry->mr = (struct fid_mr *) region->context;
 	if (pool->type == RXD_BUF_POOL_RX)
 		rxd_set_rx_pkt(pool->rxd_ep, pkt_entry);
 	else
@@ -1194,6 +1195,12 @@ int rxd_endpoint(struct fid_domain *domain, struct fi_info *info,
 	rxd_ep->rx_msg_avail = rxd_ep->rx_size;
 	rxd_ep->tx_rma_avail = rxd_ep->tx_size;
 	rxd_ep->rx_rma_avail = rxd_ep->rx_size;
+
+	rxd_ep->rx_msg.iov_count = 1;
+	rxd_ep->rx_msg.addr = FI_ADDR_UNSPEC;
+	rxd_ep->rx_msg.msg_iov = &rxd_ep->rx_iov;
+	rxd_ep->rx_iov.iov_len = rxd_ep_domain(rxd_ep)->max_mtu_sz;
+
 	fi_freeinfo(dg_info);
 
 	rxd_ep->next_retry = -1;
