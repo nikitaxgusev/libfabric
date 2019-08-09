@@ -1004,6 +1004,8 @@ static void rxd_handle_op(struct rxd_ep *ep, struct rxd_pkt_entry *pkt_entry)
 			return;
 		}
 
+		ep->peers[base_hdr->peer].rx_window  = 1;
+
 		if (ep->peers[base_hdr->peer].peer_addr != FI_ADDR_UNSPEC)
 			goto ack;
 		goto release;
@@ -1036,7 +1038,10 @@ static void rxd_handle_op(struct rxd_ep *ep, struct rxd_pkt_entry *pkt_entry)
 	}
 
 	ep->peers[base_hdr->peer].rx_seq_no++;
-	ep->peers[base_hdr->peer].rx_window = rxd_env.max_unacked;
+	ep->peers[base_hdr->peer].rx_window++;
+	if (ep->peers[base_hdr->peer].rx_window > rxd_env.max_unacked)
+		ep->peers[base_hdr->peer].rx_window = rxd_env.max_unacked;
+
 	rxd_progress_op(ep, rx_entry, pkt_entry, base_hdr, sar_hdr, tag_hdr,
 			data_hdr, rma_hdr, atom_hdr, &msg, msg_size);
 
