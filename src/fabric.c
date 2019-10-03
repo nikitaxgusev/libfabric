@@ -632,7 +632,7 @@ void fi_ini(void)
 		FI_PROV_CHECK_DL(PSM2),
 		FI_PROV_CHECK_DL(PSM),
 		FI_PROV_CHECK_DL(USNIC),
-		/* FI_PROV_CHECK_DL(MLX), */
+		FI_PROV_CHECK_DL(MLX),
 		FI_PROV_CHECK_DL(GNI),
 		FI_PROV_CHECK_DL(BGQ),
 		/* FI_PROV_CHECK_DL(NETDIR), - only Windoiws OS */
@@ -699,6 +699,7 @@ libdl_done:
 	ofi_register_provider(PSM2_INIT, NULL);
 	ofi_register_provider(PSM_INIT, NULL);
 	ofi_register_provider(USNIC_INIT, NULL);
+	ofi_register_provider(MLX_INIT, NULL);
 	ofi_register_provider(GNI_INIT, NULL);
 	ofi_register_provider(BGQ_INIT, NULL);
 	ofi_register_provider(NETDIR_INIT, NULL);
