@@ -101,6 +101,15 @@ static int ofi_find_core_name(char **names, const char *name)
 	return -1;
 }
 
+static void ofi_closest_prov_names(char *prov_name, char* miss_prov_name, int n)
+{
+	if (strncasecmp( prov_name, miss_prov_name, n ) == 0 ) {
+		FI_WARN(&core_prov, FI_LOG_CORE,
+			"Instead misspelled provider: %s, you may want: %s?\n",
+			miss_prov_name, prov_name);
+	}
+}
+
 static enum ofi_prov_type ofi_prov_type(const struct fi_provider *provider)
 {
 	const struct fi_prov_context *ctx;
@@ -476,6 +485,10 @@ void ofi_free_filter(struct fi_filter *filter)
 
 void ofi_create_filter(struct fi_filter *filter, const char *raw_filter)
 {
+	struct ofi_prov *prov;
+	int count_prov_names = 0, i = 0, not_found_names = 0;
+	char *tkn_str = NULL, *tkn_prove_names[2];
+
 	memset(filter, 0, sizeof *filter);
 	if (raw_filter == NULL)
 		return;
@@ -485,10 +498,46 @@ void ofi_create_filter(struct fi_filter *filter, const char *raw_filter)
 		++raw_filter;
 	}
 
-	filter->names= ofi_split_and_alloc(raw_filter, ",", NULL);
+	filter->names = ofi_split_and_alloc(raw_filter, ",", NULL);
 	if (!filter->names)
 		FI_WARN(&core_prov, FI_LOG_CORE,
 			"unable to parse filter from: %s\n", raw_filter);
+
+
+	tkn_str = strtok((char *)raw_filter, ";");
+	if (!tkn_str)
+		return;
+
+	while (tkn_str != NULL) {
+		count_prov_names++;
+		tkn_prove_names[i++] = tkn_str;
+		tkn_str = strtok (NULL, ";");
+	}
+
+	for(i = 0; i < count_prov_names; i++) {
+		if(!ofi_getprov(tkn_prove_names[i], strlen(tkn_prove_names[i]))) {
+			FI_WARN(&core_prov, FI_LOG_CORE,
+				"provider %s is unknown, misspelled or DL provider?\n",
+				tkn_prove_names[i]);
+			not_found_names++;
+		}
+	}
+
+	for (prov = prov_head; prov; prov = prov->next) {
+		for (i = 0; i < not_found_names; i++) {
+			if (strlen(prov->prov_name) != strlen(tkn_prove_names[i])
+				&& !strncasecmp(prov->prov_name, tkn_prove_names[i],
+						strlen(tkn_prove_names[i]))) {
+				if (strlen(tkn_prove_names[i]) > 5)
+					ofi_closest_prov_names(prov->prov_name,
+							       tkn_prove_names[i], 5);
+				else
+					ofi_closest_prov_names(prov->prov_name,
+							       tkn_prove_names[i], 2);
+			}
+		}
+	}
+
 }
 
 #ifdef HAVE_LIBDL
