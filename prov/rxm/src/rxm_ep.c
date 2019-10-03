@@ -118,7 +118,7 @@ rxm_mr_buf_reg(struct rxm_ep *rxm_ep, void *addr, size_t len, void **context)
 
 		ret = fi_mr_reg(msg_domain, addr, len,
 				FI_SEND | FI_RECV | FI_READ | FI_WRITE,
-				0, 0, 0, &mr, NULL);
+				0, 0, OFI_MR_NOCACHE, &mr, NULL);
 		*context = mr;
 	}
 
@@ -390,8 +390,9 @@ static int rxm_ep_txrx_pool_create(struct rxm_ep *rxm_ep)
 			continue;
 
 		ret = rxm_buf_pool_create(rxm_ep, entry_sizes[i],
-					  (i == RXM_BUF_POOL_RX ? 0 :
-					   rxm_ep->rxm_info->tx_attr->size),
+					  (i == RXM_BUF_POOL_RX ||
+					   i == RXM_BUF_POOL_TX_ATOMIC) ? 0 :
+					  rxm_ep->rxm_info->tx_attr->size,
 					  queue_sizes[i],
 					  &rxm_ep->buf_pools[i], i);
 		if (ret)
@@ -2155,6 +2156,8 @@ static void rxm_ep_settings_init(struct rxm_ep *rxm_ep)
 			   rxm_ep->msg_info->rx_attr->size) / 2;
 	rxm_ep->comp_per_progress = (rxm_ep->comp_per_progress > max_prog_val) ?
 				    max_prog_val : rxm_ep->comp_per_progress;
+	ofi_atomic_initialize32(&rxm_ep->atomic_tx_credits,
+				rxm_ep->rxm_info->tx_attr->size);
 
 	rxm_ep->msg_mr_local = ofi_mr_local(rxm_ep->msg_info);
 	rxm_ep->rxm_mr_local = ofi_mr_local(rxm_ep->rxm_info);

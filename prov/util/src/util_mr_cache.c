@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2016-2017 Cray Inc. All rights reserved.
  * Copyright (c) 2017-2019 Intel Corporation, Inc.  All rights reserved.
+ * Copyright (c) 2019 Amazon.com, Inc. or its affiliates. All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -76,7 +77,7 @@ static void util_mr_free_entry(struct ofi_mr_cache *cache,
 	FI_DBG(cache->domain->prov, FI_LOG_MR, "free %p (len: %" PRIu64 ")\n",
 	       entry->info.iov.iov_base, entry->info.iov.iov_len);
 
-	assert(!entry->cached);
+	assert(!entry->storage_context);
 	/* If regions are not being merged, then we can't safely
 	 * unsubscribe this region from the monitor.  Otherwise, we
 	 * might unsubscribe an address range in use by another region.
@@ -95,9 +96,7 @@ static void util_mr_free_entry(struct ofi_mr_cache *cache,
 static void util_mr_uncache_entry_storage(struct ofi_mr_cache *cache,
 					  struct ofi_mr_entry *entry)
 {
-	assert(entry->cached);
 	cache->storage.erase(&cache->storage, entry);
-	entry->cached = 0;
 	cache->cached_cnt--;
 	cache->cached_size -= entry->info.iov.iov_len;
 }
@@ -174,7 +173,7 @@ void ofi_mr_cache_delete(struct ofi_mr_cache *cache, struct ofi_mr_entry *entry)
 	cache->delete_cnt++;
 
 	if (--entry->use_cnt == 0) {
-		if (entry->cached) {
+		if (entry->storage_context) {
 			dlist_insert_tail(&entry->lru_entry, &cache->lru_list);
 		} else {
 			cache->uncached_cnt--;
@@ -198,6 +197,7 @@ util_mr_cache_create(struct ofi_mr_cache *cache, const struct iovec *iov,
 	if (OFI_UNLIKELY(!*entry))
 		return -FI_ENOMEM;
 
+	(*entry)->storage_context = NULL;
 	(*entry)->info.iov = *iov;
 	(*entry)->use_cnt = 1;
 
@@ -215,7 +215,6 @@ util_mr_cache_create(struct ofi_mr_cache *cache, const struct iovec *iov,
 
 	if ((cache->cached_cnt >= cache_params.max_cnt) ||
 	    (cache->cached_size >= cache_params.max_size)) {
-		(*entry)->cached = 0;
 		cache->uncached_cnt++;
 		cache->uncached_size += iov->iov_len;
 	} else {
@@ -224,7 +223,6 @@ util_mr_cache_create(struct ofi_mr_cache *cache, const struct iovec *iov,
 			ret = -FI_ENOMEM;
 			goto err;
 		}
-		(*entry)->cached = 1;
 		cache->cached_cnt++;
 		cache->cached_size += iov->iov_len;
 
@@ -318,6 +316,79 @@ unlock:
 	return ret;
 }
 
+struct ofi_mr_entry *ofi_mr_cache_find(struct ofi_mr_cache *cache,
+				       const struct fi_mr_attr *attr)
+{
+	struct ofi_mr_info info;
+	struct ofi_mr_entry *entry;
+
+	assert(attr->iov_count == 1);
+	FI_DBG(cache->domain->prov, FI_LOG_MR, "find %p (len: %" PRIu64 ")\n",
+	       attr->mr_iov->iov_base, attr->mr_iov->iov_len);
+
+	pthread_mutex_lock(&cache->monitor->lock);
+	cache->search_cnt++;
+
+	info.iov = *attr->mr_iov;
+	entry = cache->storage.find(&cache->storage, &info);
+	if (!entry) {
+		goto unlock;
+	}
+
+	if (!ofi_iov_within(attr->mr_iov, &entry->info.iov)) {
+		entry = NULL;
+		goto unlock;
+	}
+
+	cache->hit_cnt++;
+	if ((entry)->use_cnt++ == 0)
+		dlist_remove_init(&(entry)->lru_entry);
+
+unlock:
+	pthread_mutex_unlock(&cache->monitor->lock);
+	return entry;
+}
+
+int ofi_mr_cache_reg(struct ofi_mr_cache *cache, const struct fi_mr_attr *attr,
+		     struct ofi_mr_entry **entry)
+{
+	int ret;
+
+	assert(attr->iov_count == 1);
+	FI_DBG(cache->domain->prov, FI_LOG_MR, "reg %p (len: %" PRIu64 ")\n",
+	       attr->mr_iov->iov_base, attr->mr_iov->iov_len);
+
+	pthread_mutex_lock(&cache->monitor->lock);
+	*entry = ofi_buf_alloc(cache->entry_pool);
+	if (*entry) {
+		cache->uncached_cnt++;
+		cache->uncached_size += attr->mr_iov->iov_len;
+	} else {
+		ret = -FI_ENOMEM;
+		goto unlock;
+	}
+	pthread_mutex_unlock(&cache->monitor->lock);
+
+	(*entry)->info.iov = *attr->mr_iov;
+	(*entry)->use_cnt = 1;
+	(*entry)->storage_context = NULL;
+
+	ret = cache->add_region(cache, *entry);
+	if (ret)
+		goto buf_free;
+
+	return 0;
+
+buf_free:
+	pthread_mutex_lock(&cache->monitor->lock);
+	ofi_buf_free(*entry);
+	cache->uncached_cnt--;
+	cache->uncached_size -= attr->mr_iov->iov_len;
+unlock:
+	pthread_mutex_unlock(&cache->monitor->lock);
+	return ret;
+}
+
 void ofi_mr_cache_cleanup(struct ofi_mr_cache *cache)
 {
 	struct ofi_mr_entry *entry;
@@ -384,18 +455,18 @@ static int ofi_mr_rbt_insert(struct ofi_mr_storage *storage,
 			     struct ofi_mr_info *key,
 			     struct ofi_mr_entry *entry)
 {
+	assert(!entry->storage_context);
 	return ofi_rbmap_insert(storage->storage, (void *) key, (void *) entry,
-				NULL);
+				(struct ofi_rbnode **) &entry->storage_context);
 }
 
 static int ofi_mr_rbt_erase(struct ofi_mr_storage *storage,
 			    struct ofi_mr_entry *entry)
 {
-	struct ofi_rbnode *node;
-
-	node = ofi_rbmap_find(storage->storage, &entry->info);
-	assert(node);
-	ofi_rbmap_delete(storage->storage, node);
+	assert(entry->storage_context);
+	ofi_rbmap_delete(storage->storage,
+			 (struct ofi_rbnode *) entry->storage_context);
+	entry->storage_context = NULL;
 	return 0;
 }
 
