@@ -85,6 +85,9 @@ enum {
 	OFI_INTERCEPT_MAX
 };
 
+typedef unsigned long getauxval_func_t(unsigned long);
+getauxval_func_t* func = NULL;
+
 static void *ofi_intercept_dlopen(const char *filename, int flag);
 static void *ofi_intercept_mmap(void *start, size_t length,
 				int prot, int flags, int fd, off_t offset);
@@ -231,7 +234,11 @@ static int ofi_intercept_phdr_handler(struct dl_phdr_info *info,
 	struct ofi_intercept *intercept = data;
 	int phent, ret;
 
+#ifdef I_MPI
+	phent = (int)(*func)(AT_PHENT);
+#else  /* I_MPI */
 	phent = getauxval(AT_PHENT);
+#endif /* I_MPI */
 	if (phent <= 0) {
 		FI_DBG(&core_prov, FI_LOG_MR, "failed to read phent size");
 		return -FI_EINVAL;
@@ -305,7 +312,11 @@ static int ofi_restore_phdr_handler(struct dl_phdr_info *info,
 	struct ofi_intercept *intercept = data;
 	int phent, ret;
 
+#ifdef I_MPI
+	phent = (int)(*func)(AT_PHENT);
+#else  /* I_MPI */
 	phent = getauxval(AT_PHENT);
+#endif /* I_MPI */
 	if (phent <= 0) {
 		FI_DBG(&core_prov, FI_LOG_MR, "failed to read phent size");
 		return -FI_EINVAL;
@@ -478,6 +489,26 @@ int ofi_memhooks_init(void)
 	memhooks_monitor->subscribe = ofi_memhooks_subscribe;
 	memhooks_monitor->unsubscribe = ofi_memhooks_unsubscribe;
 	dlist_init(&memhooks.intercept_list);
+
+#ifdef I_MPI
+	void* libc_handle = NULL;
+	dlerror();
+
+	libc_handle = dlopen("libc.so.6", RTLD_LAZY);
+	if (!libc_handle) {
+		FI_DBG(&core_prov, FI_LOG_MR,
+		       "Could not dlopen() C library: %s\n", dlerror());
+		return -FI_ENOMEM;
+	}
+
+	func = (getauxval_func_t*)dlsym(libc_handle, "getauxval");
+	if (!func){
+		FI_DBG(&core_prov, FI_LOG_MR,
+		       "Could not find getauxval() in C library\n");
+		return -FI_ENOMEM;
+	}
+	dlclose(libc_handle);
+#endif /* I_MPI */
 
 	for (i = 0; i < OFI_INTERCEPT_MAX; ++i)
 		dlist_init(&intercepts[i].dl_intercept_list);
