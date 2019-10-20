@@ -419,6 +419,11 @@ static void rxr_fini(void)
 {
 	if (lower_efa_prov)
 		lower_efa_prov->cleanup();
+
+#if HAVE_EFA_DL
+	ofi_monitor_cleanup();
+	ofi_mem_fini();
+#endif
 }
 
 struct fi_provider rxr_prov = {
@@ -475,6 +480,11 @@ EFA_INI
 	fi_param_define(&rxr_prov, "timeout_interval", FI_PARAM_INT,
 			"Set the time interval (us) for the base timeout to use for exponential backoff to a peer after a receiver not ready error. (Default: 0 [random])");
 	rxr_init_env();
+
+#if HAVE_EFA_DL
+	ofi_mem_init();
+	ofi_monitor_init();
+#endif
 
 	lower_efa_prov = init_lower_efa_prov();
 	if (!lower_efa_prov)
