@@ -257,9 +257,7 @@ fi_ibv_mr_cache_reg(struct fid *fid, const void *buf, size_t len,
 	attr.requested_key = requested_key;
 	attr.auth_key_size = 0;
 
-	ret = (flags & OFI_MR_NOCACHE) ?
-	      ofi_mr_cache_reg(&domain->cache, &attr, &entry) :
-	      ofi_mr_cache_search(&domain->cache, &attr, &entry);
+	ret = ofi_mr_cache_reg(&domain->cache, &attr, &entry);
 	if (OFI_UNLIKELY(ret))
 		return ret;
 
