@@ -147,7 +147,7 @@ static int ofi_cntr_wait(struct fid_cntr *cntr_fid, uint64_t threshold, int time
 	int ret, timeout_quantum;
 
 	cntr = container_of(cntr_fid, struct util_cntr, cntr_fid);
-	assert(cntr->wait);
+	//assert(cntr->wait);
 	errcnt = ofi_atomic_get64(&cntr->err);
 	endtime = ofi_timeout_time(timeout);
 
@@ -174,8 +174,9 @@ static int ofi_cntr_wait(struct fid_cntr *cntr_fid, uint64_t threshold, int time
 		 */
 		timeout_quantum = (timeout < 0 ? OFI_TIMEOUT_QUANTUM_MS :
 				   MIN(OFI_TIMEOUT_QUANTUM_MS, timeout));
+		if(cntr->wait != NULL)
+			ret = fi_wait(&cntr->wait->wait_fid, timeout_quantum);
 
-		ret = fi_wait(&cntr->wait->wait_fid, timeout_quantum);
 	} while (!ret || (ret == -FI_ETIMEDOUT &&
 			  (timeout < 0 || timeout_quantum < timeout)));
 
