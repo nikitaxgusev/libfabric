@@ -590,7 +590,7 @@ unlock:
 int rxm_msg_eq_progress(struct rxm_ep *rxm_ep)
 {
 	struct rxm_msg_eq_entry *entry;
-       int ret;
+	int ret;
 
 	entry = alloca(RXM_MSG_EQ_ENTRY_SZ);
 	if (!entry) {
@@ -600,6 +600,7 @@ int rxm_msg_eq_progress(struct rxm_ep *rxm_ep)
 	}
 
 	while (1) {
+		memset(entry, 0, RXM_MSG_EQ_ENTRY_SZ);
 		entry->rd = rxm_eq_read(rxm_ep, RXM_MSG_EQ_ENTRY_SZ, entry);
 		if (entry->rd < 0 && entry->rd != -FI_ECONNREFUSED) {
 			ret = (int)entry->rd;
@@ -643,7 +644,7 @@ int rxm_cmap_connect(struct rxm_ep *rxm_ep, fi_addr_t fi_addr,
 		ret = -FI_EOPBADSTATE;
 	}
 	if (ret == -FI_EAGAIN)
-		rxm_msg_eq_progress(rxm_ep);
+		ret = rxm_msg_eq_progress(rxm_ep);
 
 	return ret;
 }
