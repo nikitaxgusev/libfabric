@@ -299,12 +299,16 @@ struct ofi_bufpool_attr {
 	void		(*free_fn)(struct ofi_bufpool_region *region);
 	void		(*init_fn)(struct ofi_bufpool_region *region, void *buf);
 	void 		*context;
+	uint8_t		garbage_collector;
 	int		flags;
 };
 
 struct ofi_bufpool {
 	union {
-		struct slist		entries;
+		union {
+			struct slist		slist;
+			struct dlist_entry	dlist;
+		} entries;
 		struct dlist_entry	regions;
 	} free_list;
 
@@ -316,6 +320,8 @@ struct ofi_bufpool {
 	size_t				alloc_size;
 	size_t				region_size;
 	struct ofi_bufpool_attr		attr;
+	struct ofi_bufpool_region 	*ptr_region_for_free;
+
 };
 
 struct ofi_bufpool_region {
@@ -326,9 +332,7 @@ struct ofi_bufpool_region {
 	size_t				index;
 	void 				*context;
 	struct ofi_bufpool 		*pool;
-#ifndef NDEBUG
 	size_t 				use_cnt;
-#endif
 };
 
 struct ofi_bufpool_hdr {
@@ -385,12 +389,59 @@ static inline struct ofi_bufpool *ofi_buf_pool(void *buf)
 	return ofi_buf_region(buf)->pool;
 }
 
+static inline void ofi_buf_free_region(struct ofi_bufpool *pool, void *buf)
+{
+	int ret;
+	int i;
+	if (ofi_buf_region(buf)->use_cnt == 0) {
+		if (pool->ptr_region_for_free == NULL)
+			pool->ptr_region_for_free = ofi_buf_region(buf);
+		else {
+			for (i = 0; i < pool->attr.chunk_cnt; i++) {
+				void* util_buf;
+				util_buf = pool->ptr_region_for_free->mem_region + i * pool->entry_size;
+				dlist_remove(&ofi_buf_hdr(util_buf)->entry.dlist);
+			}
+
+			for (i = 0; i < pool->region_cnt; i++) {
+				if (pool->region_table[i] == pool->ptr_region_for_free)
+					pool->region_table[i] = NULL;
+			}
+
+			if (pool->attr.free_fn)
+				pool->attr.free_fn(ofi_buf_region(buf));
+			if (pool->attr.flags & OFI_BUFPOOL_HUGEPAGES) {
+				ret = ofi_free_hugepage_buf(ofi_buf_region(buf)->alloc_region,
+						    pool->alloc_size);
+				if (ret) {
+					assert(0);
+				}
+			} else {
+				ofi_freealign(ofi_buf_region(buf)->alloc_region);
+			}
+
+			free(pool->ptr_region_for_free);
+			pool->ptr_region_for_free = ofi_buf_region(buf);
+		}
+	}
+}
+
 static inline void ofi_buf_free(void *buf)
 {
 	assert(ofi_buf_region(buf)->use_cnt--);
 	assert(!(ofi_buf_pool(buf)->attr.flags & OFI_BUFPOOL_INDEXED));
 	slist_insert_head(&ofi_buf_hdr(buf)->entry.slist,
-			  &ofi_buf_pool(buf)->free_list.entries);
+			  &ofi_buf_pool(buf)->free_list.entries.slist);
+}
+
+static inline void ofi_buf_gc_free(void *buf)
+{
+	assert(ofi_buf_region(buf)->use_cnt);
+	ofi_buf_region(buf)->use_cnt--;
+	assert(!(ofi_buf_pool(buf)->attr.flags & OFI_BUFPOOL_INDEXED));
+	dlist_insert_tail(&ofi_buf_hdr(buf)->entry.dlist,
+			  &ofi_buf_pool(buf)->free_list.entries.dlist);
+	ofi_buf_free_region(ofi_buf_pool(buf),buf);
 }
 
 int ofi_ibuf_is_lower(struct dlist_entry *item, const void *arg);
@@ -432,7 +483,12 @@ static inline void *ofi_bufpool_get_ibuf(struct ofi_bufpool *pool, size_t index)
 
 static inline int ofi_bufpool_empty(struct ofi_bufpool *pool)
 {
-	return slist_empty(&pool->free_list.entries);
+	return slist_empty(&pool->free_list.entries.slist);
+}
+
+static inline int ofi_bufpool_gc_empty(struct ofi_bufpool *pool)
+{
+	return dlist_empty(&pool->free_list.entries.dlist);
 }
 
 static inline int ofi_ibufpool_empty(struct ofi_bufpool *pool)
@@ -443,6 +499,7 @@ static inline int ofi_ibufpool_empty(struct ofi_bufpool *pool)
 static inline void *ofi_buf_alloc(struct ofi_bufpool *pool)
 {
 	struct ofi_bufpool_hdr *buf_hdr;
+	assert(pool->attr.garbage_collector);
 
 	assert(!(pool->attr.flags & OFI_BUFPOOL_INDEXED));
 	if (OFI_UNLIKELY(ofi_bufpool_empty(pool))) {
@@ -450,9 +507,31 @@ static inline void *ofi_buf_alloc(struct ofi_bufpool *pool)
 			return NULL;
 	}
 
-	slist_remove_head_container(&pool->free_list.entries,
-				struct ofi_bufpool_hdr, buf_hdr, entry.slist);
+	slist_remove_head_container(&pool->free_list.entries.slist,
+				    struct ofi_bufpool_hdr, buf_hdr, entry.slist);
 	assert(++buf_hdr->region->use_cnt);
+	return ofi_buf_data(buf_hdr);
+}
+
+static inline void *ofi_buf_gc_alloc(struct ofi_bufpool *pool)
+{
+	struct ofi_bufpool_hdr *buf_hdr;
+	assert(pool->attr.garbage_collector);
+
+	assert(!(pool->attr.flags & OFI_BUFPOOL_INDEXED));
+	if (OFI_UNLIKELY(ofi_bufpool_empty(pool))) {
+		if (ofi_bufpool_grow(pool))
+			return NULL;
+	}
+
+	dlist_pop_front(&pool->free_list.entries.dlist, struct ofi_bufpool_hdr,
+			buf_hdr, entry.dlist);
+	++buf_hdr->region->use_cnt;
+	assert(buf_hdr->region->use_cnt);
+
+	if (buf_hdr->region == pool->ptr_region_for_free)
+		pool->ptr_region_for_free = NULL;
+
 	return ofi_buf_data(buf_hdr);
 }
 

@@ -126,11 +126,19 @@ retry:
 				assert((buf_hdr->entry.dlist.next == (void *) OFI_MAGIC_64) &&
 				       (buf_hdr->entry.dlist.prev == (void *) OFI_MAGIC_64));
 			} else {
-				buf_hdr->entry.slist.next = (void *) OFI_MAGIC_64;
+				if (!pool->attr.garbage_collector) {
+					buf_hdr->entry.slist.next = (void *) OFI_MAGIC_64;
 
-				pool->attr.init_fn(buf_region, buf);
+					pool->attr.init_fn(buf_region, buf);
 
-				assert(buf_hdr->entry.slist.next == (void *) OFI_MAGIC_64);
+					assert(buf_hdr->entry.slist.next == (void *) OFI_MAGIC_64);
+				} else {
+					buf_hdr->entry.dlist.next = (void *) OFI_MAGIC_64;
+
+					pool->attr.init_fn(buf_region, buf);
+
+					assert(buf_hdr->entry.dlist.next == (void *) OFI_MAGIC_64);
+				}
 			}
 #else
 			pool->attr.init_fn(buf_region, buf);
@@ -141,7 +149,7 @@ retry:
 					  &buf_region->free_list);
 		} else {
 			slist_insert_tail(&buf_hdr->entry.slist,
-					  &pool->free_list.entries);
+					  &pool->free_list.entries.slist);
 		}
 	}
 
@@ -187,8 +195,12 @@ int ofi_bufpool_create_attr(struct ofi_bufpool_attr *attr,
 
 	if (pool->attr.flags & OFI_BUFPOOL_INDEXED)
 		dlist_init(&pool->free_list.regions);
-	else
-		slist_init(&pool->free_list.entries);
+	else {
+		if (!pool->attr.garbage_collector)
+			slist_init(&pool->free_list.entries.slist);
+		else
+			dlist_init(&pool->free_list.entries.dlist);
+	}
 
 	pool->alloc_size = (pool->attr.chunk_cnt + 1) * pool->entry_size;
 	hp_size = ofi_get_hugepage_size();
@@ -214,6 +226,8 @@ void ofi_bufpool_destroy(struct ofi_bufpool *pool)
 
 	for (i = 0; i < pool->region_cnt; i++) {
 		buf_region = pool->region_table[i];
+		if (!buf_region)
+			continue;
 
 		assert((pool->attr.flags & OFI_BUFPOOL_NO_TRACK) ||
 			(buf_region->use_cnt == 0));
