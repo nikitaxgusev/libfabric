@@ -103,7 +103,7 @@ int tcpx_comm_recv_hdr(SOCKET sock, struct stage_buf *sbuf,
 	cur_rx_msg->done_len += bytes_recvd;
 
 	if (cur_rx_msg->done_len == sizeof(cur_rx_msg->hdr.base_hdr)) {
-		cur_rx_msg->hdr_len = (size_t) cur_rx_msg->hdr.base_hdr.payload_off;
+		cur_rx_msg->hdr_len = (size_t) cur_rx_msg->hdr.base_hdr->payload_off;
 
 		if (cur_rx_msg->hdr_len > cur_rx_msg->done_len) {
 			bytes_recvd = tcpx_recv_hdr(sock, sbuf, cur_rx_msg);

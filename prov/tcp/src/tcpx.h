@@ -163,7 +163,7 @@ struct tcpx_cq_data_hdr {
 
 struct tcpx_rx_detect {
 	union {
-		struct tcpx_base_hdr	base_hdr;
+		struct tcpx_base_hdr	*base_hdr;
 		uint8_t		       	max_hdr[TCPX_MAX_HDR_SZ];
 	} hdr;
 	size_t			hdr_len;
