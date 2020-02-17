@@ -44,9 +44,7 @@ void tcpx_srx_xfer_release(struct tcpx_rx_ctx *srx_ctx,
 	if (xfer_entry->ep->cur_rx_entry == xfer_entry)
 		xfer_entry->ep->cur_rx_entry = NULL;
 
-	fastlock_acquire(&srx_ctx->lock);
 	ofi_buf_free(xfer_entry);
-	fastlock_release(&srx_ctx->lock);
 }
 
 struct tcpx_xfer_entry *

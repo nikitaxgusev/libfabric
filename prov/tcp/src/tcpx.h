@@ -290,8 +290,6 @@ struct tcpx_xfer_entry *tcpx_xfer_entry_alloc(struct tcpx_cq *cq,
 					      enum tcpx_xfer_op_codes type);
 void tcpx_xfer_entry_release(struct tcpx_cq *tcpx_cq,
 			     struct tcpx_xfer_entry *xfer_entry);
-void tcpx_srx_xfer_release(struct tcpx_rx_ctx *srx_ctx,
-			   struct tcpx_xfer_entry *xfer_entry);
 
 void tcpx_rx_msg_release(struct tcpx_xfer_entry *rx_entry);
 struct tcpx_xfer_entry *

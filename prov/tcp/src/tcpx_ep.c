@@ -310,7 +310,9 @@ void tcpx_rx_msg_release(struct tcpx_xfer_entry *rx_entry)
 	assert(rx_entry->hdr.base_hdr.op_data == TCPX_OP_MSG_RECV);
 
 	if (rx_entry->ep->srx_ctx) {
-		tcpx_srx_xfer_release(rx_entry->ep->srx_ctx, rx_entry);
+		if (rx_entry->ep->cur_rx_entry == rx_entry)
+			rx_entry->ep->cur_rx_entry = NULL;
+		ofi_buf_free(rx_entry);
 	} else {
 		tcpx_cq = container_of(rx_entry->ep->util_ep.rx_cq,
 				       struct tcpx_cq, util_cq);
