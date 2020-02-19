@@ -896,7 +896,6 @@ int DEFAULT_SYMVER_PRE(fi_getinfo)(uint32_t version, const char *node,
 	struct fi_info *tail, *cur;
 	char **prov_vec = NULL;
 	size_t count = 0;
-	enum fi_log_level level;
 	int ret;
 
 	if (!ofi_init)
@@ -945,21 +944,21 @@ int DEFAULT_SYMVER_PRE(fi_getinfo)(uint32_t version, const char *node,
 		cur = NULL;
 		ret = prov->provider->getinfo(version, node, service, flags,
 					      hints, &cur);
-		if (ret) {
-			level = ((hints && hints->fabric_attr &&
-				  hints->fabric_attr->prov_name) ?
-				 FI_LOG_WARN : FI_LOG_INFO);
 
-			FI_LOG(&core_prov, level, FI_LOG_CORE,
+		if (ret) {
+			FI_DBG(&core_prov, FI_LOG_CORE,
 			       "fi_getinfo: provider %s returned -%d (%s)\n",
 			       prov->provider->name, -ret, fi_strerror(-ret));
+			FI_INFO(&core_prov, FI_LOG_CORE,
+				"Now it is being used by %s provider\n",
+				prov->provider->name);
 			continue;
 		}
 
 		if (!cur) {
-			FI_WARN(&core_prov, FI_LOG_CORE,
-				"fi_getinfo: provider %s output empty list\n",
-				prov->provider->name);
+			FI_DBG(&core_prov, FI_LOG_CORE,
+			       "fi_getinfo: provider %s output empty list.\n"
+			       prov->provider->name);
 			continue;
 		}
 
